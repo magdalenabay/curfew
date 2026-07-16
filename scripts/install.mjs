@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copies src/ into ~/.claude/usage-guard/ and wires statusLine + the
+// Copies src/ into ~/.claude/curfew/ and wires statusLine + the
 // UserPromptSubmit and PostToolUse hooks into ~/.claude/settings.json,
 // backing up the original settings file first. Safe to re-run.
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ const here = path.dirname(url.fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..');
 const claudeDir = path.join(os.homedir(), '.claude');
 const settingsPath = path.join(claudeDir, 'settings.json');
-const installDir = path.join(claudeDir, 'usage-guard');
+const installDir = path.join(claudeDir, 'curfew');
 
 // Clear out previously-installed script files (lib/ and any top-level
 // .mjs/.sh) before copying, so a script renamed or removed since a past
@@ -37,31 +37,39 @@ if (fs.existsSync(settingsPath)) {
   settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 }
 
-const ourStatusLine = 'node ~/.claude/usage-guard/statusline.mjs';
-if (settings.statusLine && settings.statusLine.command !== ourStatusLine) {
+// Matched by script basename rather than the exact path, so an older
+// install of this same tool under a previous directory name (e.g. before
+// a rename) is recognized as "ours" and migrated instead of being
+// mistaken for an unrelated custom statusLine.
+const ourStatusLine = 'node ~/.claude/curfew/statusline.mjs';
+const looksLikeOurs = (command) => typeof command === 'string' && command.endsWith('/statusline.mjs');
+if (settings.statusLine && !looksLikeOurs(settings.statusLine.command)) {
   console.log('\nA different statusLine command is already configured — leaving it as-is.');
-  console.log('Add this manually if you want the usage-guard status line too:');
+  console.log('Add this manually if you want the curfew status line too:');
   console.log(JSON.stringify({ type: 'command', command: ourStatusLine }, null, 2));
 } else {
   settings.statusLine = { type: 'command', command: ourStatusLine };
 }
 
 // Removes any hook group under `eventName` left over from an older
-// version of this tool (e.g. tool-guard.mjs before it was replaced by
-// tool-guard.sh), then wires in the current one. Keyed on the
-// "usage-guard/" path prefix so any past or present usage-guard script
-// name is recognized, not just the exact one we're about to add.
+// version of this tool, then wires in the current one. Matched by script
+// basename (e.g. "prompt-guard.mjs") rather than a directory prefix, so
+// an install from before a rename of the containing folder — the
+// directory name is not stable across versions, the script name is —
+// is still recognized and replaced instead of left stale alongside the
+// new entry.
 function wireHook(eventName, command) {
+  const basename = command.split('/').pop();
   settings.hooks ||= {};
   settings.hooks[eventName] ||= [];
   settings.hooks[eventName] = settings.hooks[eventName].filter(
-    (group) => !(group.hooks || []).every((h) => h.command && h.command.includes('usage-guard/'))
+    (group) => !(group.hooks || []).every((h) => h.command && h.command.endsWith(`/${basename}`))
   );
   settings.hooks[eventName].push({ hooks: [{ type: 'command', command }] });
 }
 
-wireHook('UserPromptSubmit', 'node ~/.claude/usage-guard/prompt-guard.mjs');
-wireHook('PostToolUse', 'node ~/.claude/usage-guard/tool-guard.mjs');
+wireHook('UserPromptSubmit', 'node ~/.claude/curfew/prompt-guard.mjs');
+wireHook('PostToolUse', 'node ~/.claude/curfew/tool-guard.mjs');
 
 fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
 console.log(`\nWired into ${settingsPath}`);

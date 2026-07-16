@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const CONFIG_PATH = path.join(os.homedir(), '.claude', 'usage-guard', 'config.json');
+const CONFIG_PATH = path.join(os.homedir(), '.claude', 'curfew', 'config.json');
 
 const DEFAULTS = {
   // Percentages at which prompt-guard.mjs will nudge Claude, once each,

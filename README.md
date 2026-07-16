@@ -1,4 +1,4 @@
-# claude-usage-guard
+# curfew
 
 A tiny, dependency-free Claude Code hook that watches your **5-hour** and
 **weekly (7-day)** Claude.ai subscription usage limits and nudges Claude to
@@ -7,7 +7,7 @@ when the session just stops responding.
 
 Everything runs locally. No network calls, no telemetry, no data leaves
 your machine — it only reads the usage numbers Claude Code already has and
-writes small JSON state files under `~/.claude/usage-guard/`.
+writes small JSON state files under `~/.claude/curfew/`.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ aren't included in the JSON any hook receives. So:
 
 1. **`statusline.mjs`** runs as your status line, reads that data, renders
    the bar, and persists a snapshot per session to
-   `~/.claude/usage-guard/sessions/<session_id>.json` (also used to estimate
+   `~/.claude/curfew/sessions/<session_id>.json` (also used to estimate
    burn rate over time). It refreshes after every assistant message,
    including the intermediate ones inside a long tool-calling turn, so the
    snapshot stays reasonably current mid-task.
@@ -76,7 +76,7 @@ Manual setup, so you can see exactly what's changing before it changes it:
 
 ```bash
 # 1. Copy the scripts somewhere Claude Code will find them
-cp -r src ~/.claude/usage-guard
+cp -r src ~/.claude/curfew
 
 # 2. Merge settings.snippet.json into ~/.claude/settings.json by hand
 ```
@@ -92,7 +92,7 @@ Then restart Claude Code (or start a new session).
 
 ## Configuring
 
-Copy `config.example.json` to `~/.claude/usage-guard/config.json` and edit:
+Copy `config.example.json` to `~/.claude/curfew/config.json` and edit:
 
 ```json
 {
@@ -127,9 +127,9 @@ reported.
 
 ## Uninstall
 
-Remove the `statusLine` entry and the `usage-guard/prompt-guard.mjs` and
-`usage-guard/tool-guard.mjs` hooks from `~/.claude/settings.json`, then
-delete `~/.claude/usage-guard/`.
+Remove the `statusLine` entry and the `curfew/prompt-guard.mjs` and
+`curfew/tool-guard.mjs` hooks from `~/.claude/settings.json`, then
+delete `~/.claude/curfew/`.
 
 ## License
 

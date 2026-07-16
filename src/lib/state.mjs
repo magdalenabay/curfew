@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const STATE_DIR = path.join(os.homedir(), '.claude', 'usage-guard', 'sessions');
+const STATE_DIR = path.join(os.homedir(), '.claude', 'curfew', 'sessions');
 const MAX_HISTORY_SAMPLES = 40;
 // One rate-limit window (7 days) plus slack, so we never prune a session
 // that's still inside its own weekly window.

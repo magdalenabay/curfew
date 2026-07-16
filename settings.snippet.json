@@ -1,20 +1,20 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "node ~/.claude/usage-guard/statusline.mjs"
+    "command": "node ~/.claude/curfew/statusline.mjs"
   },
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "node ~/.claude/usage-guard/prompt-guard.mjs" }
+          { "type": "command", "command": "node ~/.claude/curfew/prompt-guard.mjs" }
         ]
       }
     ],
     "PostToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "node ~/.claude/usage-guard/tool-guard.mjs" }
+          { "type": "command", "command": "node ~/.claude/curfew/tool-guard.mjs" }
         ]
       }
     ]

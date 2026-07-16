@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Claude Code PostToolUse hook — fires after EVERY tool call, mid-turn,
 // not just at the start of the next user message. This is what lets
-// usage-guard interrupt a long autonomous run before it runs out the
-// clock mid-edit, instead of only warning once Claude is already done
-// and waiting on you to send another message.
+// curfew interrupt a long autonomous run before it runs out the clock
+// mid-edit, instead of only warning once Claude is already done and
+// waiting on you to send another message.
 //
 // A bash+jq "gate" version of this was tried to dodge Node's ~70ms
 // startup cost on the common no-op case, but measured slower in
