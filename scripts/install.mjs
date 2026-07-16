@@ -61,7 +61,7 @@ function wireHook(eventName, command) {
 }
 
 wireHook('UserPromptSubmit', 'node ~/.claude/usage-guard/prompt-guard.mjs');
-wireHook('PostToolUse', 'bash ~/.claude/usage-guard/tool-guard.sh');
+wireHook('PostToolUse', 'node ~/.claude/usage-guard/tool-guard.mjs');
 
 fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
 console.log(`\nWired into ${settingsPath}`);
