@@ -14,7 +14,7 @@
     "PostToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "node ~/.claude/usage-guard/tool-guard.mjs" }
+          { "type": "command", "command": "bash ~/.claude/usage-guard/tool-guard.sh" }
         ]
       }
     ]

@@ -13,7 +13,19 @@ const claudeDir = path.join(os.homedir(), '.claude');
 const settingsPath = path.join(claudeDir, 'settings.json');
 const installDir = path.join(claudeDir, 'usage-guard');
 
+// Clear out previously-installed script files (lib/ and any top-level
+// .mjs/.sh) before copying, so a script renamed or removed since a past
+// install (e.g. old tool-guard.mjs) doesn't linger alongside the current
+// ones. sessions/ and a user's own config.json live in this same
+// directory but aren't scripts, so the extension/name filter leaves them
+// untouched.
 fs.mkdirSync(installDir, { recursive: true });
+fs.rmSync(path.join(installDir, 'lib'), { recursive: true, force: true });
+for (const entry of fs.readdirSync(installDir)) {
+  if (entry.endsWith('.mjs') || entry.endsWith('.sh')) {
+    fs.rmSync(path.join(installDir, entry), { force: true });
+  }
+}
 fs.cpSync(path.join(repoRoot, 'src'), installDir, { recursive: true });
 console.log(`Copied scripts to ${installDir}`);
 
@@ -34,21 +46,22 @@ if (settings.statusLine && settings.statusLine.command !== ourStatusLine) {
   settings.statusLine = { type: 'command', command: ourStatusLine };
 }
 
-function wireHook(eventName, scriptName) {
+// Removes any hook group under `eventName` left over from an older
+// version of this tool (e.g. tool-guard.mjs before it was replaced by
+// tool-guard.sh), then wires in the current one. Keyed on the
+// "usage-guard/" path prefix so any past or present usage-guard script
+// name is recognized, not just the exact one we're about to add.
+function wireHook(eventName, command) {
   settings.hooks ||= {};
   settings.hooks[eventName] ||= [];
-  const alreadyWired = settings.hooks[eventName].some((group) =>
-    (group.hooks || []).some((h) => h.command && h.command.includes(`usage-guard/${scriptName}`))
+  settings.hooks[eventName] = settings.hooks[eventName].filter(
+    (group) => !(group.hooks || []).every((h) => h.command && h.command.includes('usage-guard/'))
   );
-  if (!alreadyWired) {
-    settings.hooks[eventName].push({
-      hooks: [{ type: 'command', command: `node ~/.claude/usage-guard/${scriptName}` }]
-    });
-  }
+  settings.hooks[eventName].push({ hooks: [{ type: 'command', command }] });
 }
 
-wireHook('UserPromptSubmit', 'prompt-guard.mjs');
-wireHook('PostToolUse', 'tool-guard.mjs');
+wireHook('UserPromptSubmit', 'node ~/.claude/usage-guard/prompt-guard.mjs');
+wireHook('PostToolUse', 'bash ~/.claude/usage-guard/tool-guard.sh');
 
 fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
 console.log(`\nWired into ${settingsPath}`);

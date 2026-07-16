@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Claude Code PostToolUse hook — fires after EVERY tool call, mid-turn,
-// not just at the start of the next user message. This is what lets
-// usage-guard interrupt a long autonomous run before it runs out the
-// clock mid-edit, instead of only warning once Claude is already done
-// and waiting on you to send another message.
+// Real PostToolUse nudge logic (threshold tracking, ETA estimate, state
+// mutation). NOT wired directly into settings.json — tool-guard.sh is the
+// actual hook entrypoint; it does a cheap bash+jq gate check first and
+// only spawns this script when a threshold might actually have been
+// crossed, since PostToolUse fires after every single tool call and
+// Node's ~70ms startup cost isn't worth paying on the common no-op case.
 //
 // Uses hookSpecificOutput.additionalContext, which Claude Code injects
 // next to the tool result — the conversation continues so Claude reads
