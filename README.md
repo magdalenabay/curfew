@@ -68,6 +68,18 @@ echo '{"model":{"display_name":"Opus"},"session_id":"t","rate_limits":{"five_hou
 echo '{"session_id":"t","tool_name":"Edit"}' | node src/tool-guard.mjs
 ```
 
+## Troubleshooting
+
+**Status line/nudges silently don't appear, but the installer ran fine.**
+If Node is managed by `nvm` (common on macOS/Linux), the shell Claude Code
+uses to run hook/statusLine commands may not source `.zshrc`/`.bashrc` —
+so `node` isn't on `PATH` there, even though it works fine in your normal
+terminal. The installer auto-detects this and wraps commands in a small
+`bash -lc` snippet that sources `nvm.sh` directly, so a plain re-run of
+`node scripts/install.mjs` should fix it. Restarting Claude Code fully
+(fully quit, not just a new tab/window) is required either way — settings
+are only read at startup.
+
 ## Uninstall
 
 Remove the `statusLine` entry and the `curfew/prompt-guard.mjs` and
