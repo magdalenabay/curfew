@@ -1,0 +1,12 @@
+{
+  "name": "claude-usage-guard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Claude Code hook that watches your 5-hour and weekly usage limits and nudges Claude to wrap up before you hit the cap.",
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "install-hooks": "node scripts/install.mjs"
+  }
+}

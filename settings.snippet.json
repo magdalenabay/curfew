@@ -1,0 +1,15 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node ~/.claude/usage-guard/statusline.mjs"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node ~/.claude/usage-guard/prompt-guard.mjs" }
+        ]
+      }
+    ]
+  }
+}

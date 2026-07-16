@@ -1,0 +1,7 @@
+{
+  "thresholds": {
+    "five_hour": [70, 85, 95],
+    "seven_day": [70, 90]
+  },
+  "bar": { "width": 10 }
+}
