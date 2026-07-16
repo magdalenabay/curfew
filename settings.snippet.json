@@ -10,6 +10,13 @@
           { "type": "command", "command": "node ~/.claude/usage-guard/prompt-guard.mjs" }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node ~/.claude/usage-guard/tool-guard.mjs" }
+        ]
+      }
     ]
   }
 }

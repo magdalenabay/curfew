@@ -22,13 +22,17 @@ writes small JSON state files under `~/.claude/usage-guard/`.
 
 - **Status line**: shows a live `5h [▓▓▓▓▓░░░░░] 63% (resets 2:14 PM) · 7d 21%`
   bar, color-coded green/yellow/red at 70%/90%.
-- **Proactive nudge**: as you cross configurable thresholds (default 70/85/95%
-  for the 5-hour window, 70/90% for the weekly window), Claude is told —
-  directly, in its own context — that the window is getting tight, roughly
-  how long until it resets, and an estimate of how long until you'd hit the
-  cap at your current pace. It's asked to consider wrapping up and
-  summarizing progress. Each threshold nudges once per window; the count
-  resets automatically once Anthropic resets that window.
+- **Proactive nudge, including mid-task**: as you cross configurable
+  thresholds (default 70/85/95% for the 5-hour window, 70/90% for the
+  weekly window), Claude is told — directly, in its own context — that the
+  window is getting tight, roughly how long until it resets, and an
+  estimate of how long until you'd hit the cap at your current pace. It's
+  told to wrap up or checkpoint the current task now, rather than leaving
+  code half-edited. This fires **during** a long autonomous run (after
+  every tool call), not only when you send your next message — that's the
+  difference between catching it at 85% and finding unfinished work after
+  it hit 100% with nobody watching. Each threshold nudges once per window;
+  the count resets automatically once Anthropic resets that window.
 
 ## How it works
 
@@ -40,17 +44,25 @@ aren't included in the JSON any hook receives. So:
 1. **`statusline.mjs`** runs as your status line, reads that data, renders
    the bar, and persists a snapshot per session to
    `~/.claude/usage-guard/sessions/<session_id>.json` (also used to estimate
-   burn rate over time).
-2. **`prompt-guard.mjs`** runs as a `UserPromptSubmit` hook (fires right
-   before each of your messages is processed). It reads that same state
-   file and, if a threshold's been freshly crossed, prints a plain-text
-   message to stdout.
-
-The reason this works: for most hook events, stdout is only written to a
-debug log. `UserPromptSubmit` (along with `SessionStart` and
-`UserPromptExpansion`) is a documented exception — its stdout is *added to
-Claude's context*, so this is genuinely visible to the model, not just a
-line in your terminal.
+   burn rate over time). It refreshes after every assistant message,
+   including the intermediate ones inside a long tool-calling turn, so the
+   snapshot stays reasonably current mid-task.
+2. **`tool-guard.mjs`** runs as a `PostToolUse` hook, which fires after
+   *every single tool call* — the key piece for mid-task awareness. It
+   reads the state file `statusline.mjs` maintains and, on a freshly
+   crossed threshold, returns `hookSpecificOutput.additionalContext` in its
+   JSON output. Claude Code injects that next to the tool result, and
+   Claude reads it and can act on it in the same turn — no need to wait
+   for you to send another message.
+3. **`prompt-guard.mjs`** runs as a `UserPromptSubmit` hook (fires right
+   before each of your messages is processed) as a fallback for turns with
+   no tool calls at all, where `tool-guard.mjs` never gets a chance to
+   fire. It shares the same state file and threshold-tracking, so a
+   crossing already announced mid-task by `tool-guard.mjs` won't be
+   repeated here. Its plain-text stdout is added to Claude's context too —
+   `UserPromptSubmit` (along with `SessionStart` and `UserPromptExpansion`)
+   is one of the few hook events where that's documented to happen; for
+   most other hooks stdout only goes to a debug log.
 
 ## Install
 
@@ -97,12 +109,15 @@ directly:
 ```bash
 echo '{"model":{"display_name":"Opus"},"session_id":"test-1","rate_limits":{"five_hour":{"used_percentage":92,"resets_at":9999999999},"seven_day":{"used_percentage":40,"resets_at":9999999999}}}' | node src/statusline.mjs
 
+echo '{"session_id":"test-1","tool_name":"Edit"}' | node src/tool-guard.mjs
+
 echo '{"session_id":"test-1"}' | node src/prompt-guard.mjs
 ```
 
-Run the second command a few times with the state file already primed by
-the first — you should see the nudge message once, then silence until a
-higher threshold is crossed or the window resets.
+Run either of the last two commands again — you should see the nudge
+once, then silence until a higher threshold is crossed or the window
+resets, and neither hook re-announces a crossing the other already
+reported.
 
 ## Uninstall
 

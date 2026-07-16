@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Copies src/ into ~/.claude/usage-guard/ and wires statusLine + the
-// UserPromptSubmit hook into ~/.claude/settings.json, backing up the
-// original settings file first. Safe to re-run.
+// UserPromptSubmit and PostToolUse hooks into ~/.claude/settings.json,
+// backing up the original settings file first. Safe to re-run.
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -25,24 +25,30 @@ if (fs.existsSync(settingsPath)) {
   settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 }
 
-if (settings.statusLine) {
-  console.log('\nA statusLine command is already configured — leaving it as-is.');
+const ourStatusLine = 'node ~/.claude/usage-guard/statusline.mjs';
+if (settings.statusLine && settings.statusLine.command !== ourStatusLine) {
+  console.log('\nA different statusLine command is already configured — leaving it as-is.');
   console.log('Add this manually if you want the usage-guard status line too:');
-  console.log(JSON.stringify({ type: 'command', command: 'node ~/.claude/usage-guard/statusline.mjs' }, null, 2));
+  console.log(JSON.stringify({ type: 'command', command: ourStatusLine }, null, 2));
 } else {
-  settings.statusLine = { type: 'command', command: 'node ~/.claude/usage-guard/statusline.mjs' };
+  settings.statusLine = { type: 'command', command: ourStatusLine };
 }
 
-settings.hooks ||= {};
-settings.hooks.UserPromptSubmit ||= [];
-const alreadyWired = settings.hooks.UserPromptSubmit.some((group) =>
-  (group.hooks || []).some((h) => h.command && h.command.includes('usage-guard/prompt-guard.mjs'))
-);
-if (!alreadyWired) {
-  settings.hooks.UserPromptSubmit.push({
-    hooks: [{ type: 'command', command: 'node ~/.claude/usage-guard/prompt-guard.mjs' }]
-  });
+function wireHook(eventName, scriptName) {
+  settings.hooks ||= {};
+  settings.hooks[eventName] ||= [];
+  const alreadyWired = settings.hooks[eventName].some((group) =>
+    (group.hooks || []).some((h) => h.command && h.command.includes(`usage-guard/${scriptName}`))
+  );
+  if (!alreadyWired) {
+    settings.hooks[eventName].push({
+      hooks: [{ type: 'command', command: `node ~/.claude/usage-guard/${scriptName}` }]
+    });
+  }
 }
+
+wireHook('UserPromptSubmit', 'prompt-guard.mjs');
+wireHook('PostToolUse', 'tool-guard.mjs');
 
 fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
 console.log(`\nWired into ${settingsPath}`);

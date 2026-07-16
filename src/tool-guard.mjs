@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-// Claude Code UserPromptSubmit hook. Plain stdout from this hook (exit 0)
-// is injected into Claude's context — the one hook event where that's true —
-// so this is how Claude actually gets "told" to wrap up, rather than just
-// showing a human a status bar. Catches sessions where a whole reply had
-// no tool calls, which tool-guard.mjs (PostToolUse) would otherwise miss.
+// Claude Code PostToolUse hook — fires after EVERY tool call, mid-turn,
+// not just at the start of the next user message. This is what lets
+// usage-guard interrupt a long autonomous run before it runs out the
+// clock mid-edit, instead of only warning once Claude is already done
+// and waiting on you to send another message.
+//
+// Uses hookSpecificOutput.additionalContext, which Claude Code injects
+// next to the tool result — the conversation continues so Claude reads
+// it and can act on it immediately, in the same turn.
 import { readState, writeState } from './lib/state.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { computeNudges } from './lib/nudge.mjs';
@@ -30,7 +34,14 @@ process.stdin.on('end', () => {
 
   if (messages.length) {
     writeState(sessionId, state);
-    console.log(messages.join('\n'));
+    console.log(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUse',
+          additionalContext: messages.join('\n')
+        }
+      })
+    );
   }
 
   process.exit(0);
