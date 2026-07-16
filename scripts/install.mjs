@@ -7,6 +7,8 @@ import path from 'node:path';
 import os from 'node:os';
 import url from 'node:url';
 
+console.log('Installing curfew...\n');
+
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..');
 const claudeDir = path.join(os.homedir(), '.claude');
@@ -72,5 +74,5 @@ wireHook('UserPromptSubmit', 'node ~/.claude/curfew/prompt-guard.mjs');
 wireHook('PostToolUse', 'node ~/.claude/curfew/tool-guard.mjs');
 
 fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
-console.log(`\nWired into ${settingsPath}`);
-console.log('Restart Claude Code (or start a new session) to pick it up.');
+console.log(`Wired into ${settingsPath}`);
+console.log('\nDone. Restart Claude Code (or start a new session) to pick it up.');
