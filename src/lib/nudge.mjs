@@ -49,7 +49,7 @@ export function computeNudges(state, config, nowSeconds) {
       }
     }
 
-    const resetStr = formatResetTime(resetsAt);
+    const resetStr = formatResetTime(resetsAt, nowSeconds * 1000);
     let msg = `Curfew: ${LABELS[win]} window at ${Math.round(pct)}%`;
     if (resetStr) msg += ` (resets ${resetStr})`;
     if (etaStr) msg += `. At the current pace you may hit the cap in ~${etaStr}`;

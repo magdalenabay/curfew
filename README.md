@@ -27,8 +27,10 @@ Prefer to do it by hand? Copy `src/` to `~/.claude/curfew/` and merge
 
 ## What it does
 
-- **Status line**: `5h [▓▓▓▓▓░░░░░] 63% (resets 2:14 PM) · 7d 21%`,
-  color-coded green/yellow/red at 70%/90%.
+- **Status line**: `5h [▓▓▓▓▓░░░░░] 63% (resets 2:14 PM) · 7d [▓▓░░░░░░░░] 21% (resets Thu 9:00 AM)`,
+  color-coded green/yellow/red at 70%/90%. Reset times carry a day
+  (`tomorrow`/`Thu`/`Aug 23`) whenever the window doesn't reset today, since
+  the weekly one is usually days out.
 - **Nudges Claude directly**, in its own context, as you cross configurable
   thresholds (default 70/85/95% for the 5-hour window, 70/90% for the
   weekly one) — telling it to wrap up or checkpoint now, with an ETA to the
