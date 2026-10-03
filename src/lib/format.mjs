@@ -50,3 +50,18 @@ export function formatDuration(seconds) {
   if (d > 0) return h > 0 ? `${d}d${h}h` : `${d}d`;
   return h > 0 ? `${h}h${m}m` : `${m}m`;
 }
+
+export function fmtTokens(n) {
+  if (n == null || !Number.isFinite(n)) return null;
+  const abs = Math.max(0, Math.round(n));
+  if (abs < 1000) return String(abs);
+  if (abs < 1_000_000) return `${Math.round(abs / 1000)}k`;
+  return `${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+}
+
+// m:ss, for a countdown close enough that the seconds matter. Further out,
+// formatDuration's units say "46m" without reading like an hour and 46 minutes.
+export function fmtClock(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}

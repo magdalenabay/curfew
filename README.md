@@ -27,16 +27,61 @@ Prefer to do it by hand? Copy `src/` to `~/.claude/curfew/` and merge
 
 ## What it does
 
-- **Status line**: `5h [▓▓▓▓▓░░░░░] 63% (resets 2:14 PM) · 7d [▓▓░░░░░░░░] 21% (resets Thu 9:00 AM)`,
+- **Status line**: `5h [▓▓▓▓▓░░░░░] 63% (resets 2:14 PM) · 7d [▓▓░░░░░░░░] 21% (resets Thu 9:00 AM) · cache [▓▓▓▓▓▓▓▓▓░] 91% (cold in 3:41)`,
   color-coded green/yellow/red at 70%/90%. Reset times carry a day
   (`tomorrow`/`Thu`/`Aug 23`) whenever the window doesn't reset today, since
   the weekly one is usually days out.
+- **Prompt-cache meter**, because a cold cache spends your windows on work
+  you already paid for — see [Prompt cache](#prompt-cache) below.
 - **Nudges Claude directly**, in its own context, as you cross configurable
   thresholds (default 70/85/95% for the 5-hour window, 70/90% for the
   weekly one) — telling it to wrap up or checkpoint now, with an ETA to the
   cap based on recent burn rate. Fires mid-task (after every tool call),
   not only at your next message, so a long autonomous run gets a chance to
   land cleanly instead of getting cut off mid-edit.
+
+## Prompt cache
+
+Claude Code re-sends the whole conversation on every request and relies on
+Anthropic's [prompt cache](https://code.claude.com/docs/en/prompt-caching) so
+you're only charged ~0.1x for the part that hasn't changed. The entry lives 5
+minutes by default (1 hour on a subscription within its plan usage), every
+request refreshes it for free, and a change to the prefix — model, effort,
+thinking settings, tool set, system prompt, `CLAUDE.md` — makes the next
+request write instead of read. Go quiet long enough and it lapses, and the
+next request re-writes the entire prompt at 1.25x (5m) or 2x (1h) input rate.
+
+On a 150k-token context that's a five-figure token bill against the same
+5-hour and weekly windows curfew already watches, for zero work. So curfew
+reports it:
+
+```
+cache [▓▓▓▓▓▓▓▓▓░] 91% (cold in 3:41)        warm, 91% of input served from cache
+cache [▓▓▓▓▓▓▓▓░░] 77% (cold in 0:40)        yellow: under warn_seconds left
+cache [▓▓▓▓▓▓▓▓▓░] 88% (cold, rebuild 151k)  red: lapsed, and the rebuild is expensive
+cache [▓▓▓▓▓░░░░░] 50% (cold, rebuild 20k)   yellow: lapsed, but cheap to rebuild
+cache [▓▓▓░░░░░░░] 30% (not cached)          last response reported no cache tokens
+cache off                                    caching disabled, or the provider doesn't report it
+```
+
+The bar is the session's cache hit ratio; the parenthetical is the current
+entry's countdown, in `m:ss` inside the last 10 minutes and `46m` beyond it.
+Colour tracks cache *health* rather than repeating the bar: green while warm,
+yellow once it's nearly up, and red only for a lapsed cache whose rebuild
+exceeds `compact_at_tokens` — a cold 20k prompt isn't worth alarming about.
+
+**It also nudges Claude once per lapsed entry**, when the rebuild crosses that
+threshold, naming the cost and Claude Code's diagnosis of the last miss
+(`tools_changed`, `system_prompt_changed`, `ttl_expired_5m`, …). Claude can't
+run `/compact` itself, so the nudge asks it to checkpoint and pass the
+suggestion on to you.
+
+All of it comes from the `prompt_cache` object Claude Code puts on the status
+line's stdin, which needs **Claude Code 2.1.251+** (miss causes: 2.1.260+).
+Older versions simply don't get the segment. Unlike a function-hooks mod — which
+is handed only the four raw token counts and has to infer the lifetime by
+watching whether a late request still hit — Claude Code has already worked out
+the TTL, hit ratio and miss causes, so curfew just reads them.
 
 ## How it works
 
@@ -57,17 +102,38 @@ Copy `config.example.json` to `~/.claude/curfew/config.json`:
 ```json
 {
   "thresholds": { "five_hour": [70, 85, 95], "seven_day": [70, 90] },
-  "bar": { "width": 10 }
+  "bar": { "width": 10 },
+  "cache": {
+    "enabled": true,
+    "warn_seconds": 60,
+    "compact_at_tokens": 100000,
+    "show_misses": false,
+    "nudge": true
+  }
 }
 ```
 
 Set a window to `[]` to disable nudging for it (status line still shows it).
+
+`cache.warn_seconds` is when the meter turns yellow; `compact_at_tokens` is the
+rebuild size above which a lapsed cache goes red and nudges (a judgement call,
+not a documented figure — lower it if cache writes are expensive for you);
+`show_misses` appends the session's miss count; `enabled: false` drops the
+segment entirely and `nudge: false` keeps the meter but stops the nudge.
 
 ## Testing without waiting on real usage
 
 ```bash
 echo '{"model":{"display_name":"Opus"},"session_id":"t","rate_limits":{"five_hour":{"used_percentage":92,"resets_at":9999999999}}}' | node src/statusline.mjs
 echo '{"session_id":"t","tool_name":"Edit"}' | node src/tool-guard.mjs
+```
+
+A lapsed, expensive cache — the status line records it, then the guard nudges
+on it (and stays quiet on a second call, since it's one nudge per entry):
+
+```bash
+echo '{"model":{"display_name":"Opus"},"session_id":"c","prompt_cache":{"warm":false,"caching_observed":true,"ttl":"5m","expires_at":1,"hit_ratio":0.88,"misses":3,"recache_tokens_if_cold":151000,"last_miss_cause":{"causes":["ttl_expired_5m"]}}}' | node src/statusline.mjs
+echo '{"session_id":"c"}' | node src/prompt-guard.mjs
 ```
 
 ## Troubleshooting

@@ -3,5 +3,12 @@
     "five_hour": [70, 85, 95],
     "seven_day": [70, 90]
   },
-  "bar": { "width": 10 }
+  "bar": { "width": 10 },
+  "cache": {
+    "enabled": true,
+    "warn_seconds": 60,
+    "compact_at_tokens": 100000,
+    "show_misses": false,
+    "nudge": true
+  }
 }

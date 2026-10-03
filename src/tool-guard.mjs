@@ -33,7 +33,9 @@ process.stdin.on('end', () => {
   if (!sessionId) process.exit(0);
 
   const state = readState(sessionId);
-  if (!state.rate_limits) process.exit(0); // statusline.mjs hasn't reported anything yet
+  // Nothing from statusline.mjs yet. Either source alone is enough: usage
+  // windows need a subscription, the prompt cache doesn't.
+  if (!state.rate_limits && !state.prompt_cache) process.exit(0);
 
   const config = loadConfig();
   const now = Math.floor(Date.now() / 1000);

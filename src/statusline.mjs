@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// Claude Code statusLine command. Renders 5-hour/weekly rate-limit usage
-// and is the ONLY place this data is exposed, so it also persists a snapshot
-// per session for prompt-guard.mjs (a hook) to read, since hooks don't
-// receive rate_limits on their own stdin.
+// Claude Code statusLine command. Renders 5-hour/weekly rate-limit usage and
+// prompt-cache state, and is the ONLY place either is exposed, so it also
+// persists a snapshot per session for prompt-guard.mjs and tool-guard.mjs
+// (hooks) to read, since hooks get neither `rate_limits` nor `prompt_cache`
+// on their own stdin.
 import { readState, writeState, pruneStaleSessions, MAX_HISTORY_SAMPLES } from './lib/state.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { bar, colorFor, RESET, formatResetTime } from './lib/format.mjs';
+import { cacheSegment } from './lib/cache.mjs';
 
 const WINDOWS = ['five_hour', 'seven_day'];
 const LABELS = { five_hour: '5h', seven_day: '7d' };
@@ -23,9 +25,12 @@ process.stdin.on('end', () => {
   const model = data.model?.display_name || 'Claude';
   const sessionId = data.session_id;
   const rateLimits = data.rate_limits;
+  const promptCache = data.prompt_cache;
 
-  if (!sessionId || !rateLimits) {
+  if (!sessionId || (!rateLimits && !promptCache)) {
     // Not a Pro/Max session yet, or no API response has landed. Nothing to show.
+    // (`rate_limits` needs a Claude.ai subscription; `prompt_cache` arrives on
+    // any provider, so either one on its own is worth rendering.)
     console.log(`[${model}]`);
     return;
   }
@@ -35,16 +40,21 @@ process.stdin.on('end', () => {
   const now = Math.floor(Date.now() / 1000);
 
   state.history ||= {};
-  for (const win of WINDOWS) {
-    const w = rateLimits[win];
-    if (!w || w.used_percentage == null) continue;
-    state.history[win] ||= [];
-    state.history[win].push({ t: now, pct: w.used_percentage });
-    if (state.history[win].length > MAX_HISTORY_SAMPLES) {
-      state.history[win] = state.history[win].slice(-MAX_HISTORY_SAMPLES);
+  if (rateLimits) {
+    for (const win of WINDOWS) {
+      const w = rateLimits[win];
+      if (!w || w.used_percentage == null) continue;
+      state.history[win] ||= [];
+      state.history[win].push({ t: now, pct: w.used_percentage });
+      if (state.history[win].length > MAX_HISTORY_SAMPLES) {
+        state.history[win] = state.history[win].slice(-MAX_HISTORY_SAMPLES);
+      }
     }
+    state.rate_limits = rateLimits;
   }
-  state.rate_limits = rateLimits;
+  // Written on every render, so a cache entry that has since been refreshed
+  // never leaves a stale `expires_at` behind for the guards to count down.
+  state.prompt_cache = promptCache ?? null;
   state.updated_at = now;
   writeState(sessionId, state);
 
@@ -53,7 +63,7 @@ process.stdin.on('end', () => {
 
   const segments = [];
   for (const win of WINDOWS) {
-    const w = rateLimits[win];
+    const w = rateLimits?.[win];
     if (!w || w.used_percentage == null) continue;
     const pct = Math.round(w.used_percentage);
     const color = colorFor(pct);
@@ -62,6 +72,9 @@ process.stdin.on('end', () => {
       `${color}${LABELS[win]} ${bar(pct, config.bar.width)} ${pct}%${RESET}${resetStr ? ` (resets ${resetStr})` : ''}`
     );
   }
+
+  const cache = cacheSegment(promptCache, config, now * 1000);
+  if (cache) segments.push(cache);
 
   console.log(segments.length ? `[${model}] ${segments.join('  ·  ')}` : `[${model}]`);
 });
