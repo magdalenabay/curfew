@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// Claude Code statusLine command. Renders 5-hour/weekly rate-limit usage and
-// prompt-cache state, and is the ONLY place either is exposed, so it also
-// persists a snapshot per session for prompt-guard.mjs and tool-guard.mjs
-// (hooks) to read, since hooks get neither `rate_limits` nor `prompt_cache`
-// on their own stdin.
+// Claude Code statusLine command. Renders 5-hour/weekly rate-limit usage,
+// prompt-cache state and context-window fill. It's the ONLY place the first
+// two are exposed, so it also persists a snapshot per session for
+// prompt-guard.mjs and tool-guard.mjs (hooks) to read, since hooks get
+// neither `rate_limits` nor `prompt_cache` on their own stdin.
 import { readState, writeState, pruneStaleSessions, MAX_HISTORY_SAMPLES } from './lib/state.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { bar, colorFor, RESET, formatResetTime } from './lib/format.mjs';
 import { cacheSegment } from './lib/cache.mjs';
+import { contextSegment } from './lib/context.mjs';
 
 const WINDOWS = ['five_hour', 'seven_day'];
 const LABELS = { five_hour: '5h', seven_day: '7d' };
@@ -27,18 +28,44 @@ process.stdin.on('end', () => {
   const rateLimits = data.rate_limits;
   const promptCache = data.prompt_cache;
 
-  if (!sessionId || (!rateLimits && !promptCache)) {
-    // Not a Pro/Max session yet, or no API response has landed. Nothing to show.
-    // (`rate_limits` needs a Claude.ai subscription; `prompt_cache` arrives on
-    // any provider, so either one on its own is worth rendering.)
+  if (!sessionId) {
     console.log(`[${model}]`);
     return;
   }
 
   const config = loadConfig();
-  const state = readState(sessionId);
   const now = Math.floor(Date.now() / 1000);
 
+  // Without `rate_limits` (not a Pro/Max session, or no API response yet) and
+  // `prompt_cache` (older Claude Code) there's nothing for the guards to read,
+  // but the context meter can still have something to show.
+  if (rateLimits || promptCache) {
+    persist(sessionId, rateLimits, promptCache, now);
+  }
+
+  const segments = [];
+  for (const win of WINDOWS) {
+    const w = rateLimits?.[win];
+    if (!w || w.used_percentage == null) continue;
+    const pct = Math.round(w.used_percentage);
+    const color = colorFor(pct);
+    const resetStr = formatResetTime(w.resets_at);
+    segments.push(
+      `${color}${LABELS[win]} ${bar(pct, config.bar.width)} ${pct}%${RESET}${resetStr ? ` (resets ${resetStr})` : ''}`
+    );
+  }
+
+  const cache = cacheSegment(promptCache, config, now * 1000);
+  if (cache) segments.push(cache);
+
+  const ctx = contextSegment(data, config);
+  if (ctx) segments.push(ctx);
+
+  console.log(segments.length ? `[${model}] ${segments.join('  ·  ')}` : `[${model}]`);
+});
+
+function persist(sessionId, rateLimits, promptCache, now) {
+  const state = readState(sessionId);
   state.history ||= {};
   if (rateLimits) {
     for (const win of WINDOWS) {
@@ -60,21 +87,4 @@ process.stdin.on('end', () => {
 
   // Occasional housekeeping; cheap enough to check on every render.
   if (Math.random() < 0.02) pruneStaleSessions();
-
-  const segments = [];
-  for (const win of WINDOWS) {
-    const w = rateLimits?.[win];
-    if (!w || w.used_percentage == null) continue;
-    const pct = Math.round(w.used_percentage);
-    const color = colorFor(pct);
-    const resetStr = formatResetTime(w.resets_at);
-    segments.push(
-      `${color}${LABELS[win]} ${bar(pct, config.bar.width)} ${pct}%${RESET}${resetStr ? ` (resets ${resetStr})` : ''}`
-    );
-  }
-
-  const cache = cacheSegment(promptCache, config, now * 1000);
-  if (cache) segments.push(cache);
-
-  console.log(segments.length ? `[${model}] ${segments.join('  ·  ')}` : `[${model}]`);
-});
+}

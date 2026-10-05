@@ -10,5 +10,6 @@
     "compact_at_tokens": 100000,
     "show_misses": false,
     "nudge": true
-  }
+  },
+  "context": { "enabled": true }
 }

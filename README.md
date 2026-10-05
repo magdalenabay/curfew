@@ -27,10 +27,12 @@ Prefer to do it by hand? Copy `src/` to `~/.claude/curfew/` and merge
 
 ## What it does
 
-- **Status line**: `5h [▓▓▓▓▓░░░░░] 63% (resets 2:14 PM) · 7d [▓▓░░░░░░░░] 21% (resets Thu 9:00 AM) · cache [▓▓▓▓▓▓▓▓▓░] 91% (cold in 3:41)`,
+- **Status line**: `5h [▓▓▓▓▓░░░░░] 63% (resets 2:14 PM) · 7d [▓▓░░░░░░░░] 21% (resets Thu 9:00 AM) · cache [▓▓▓▓▓▓▓▓▓░] 91% (cold in 3:41) · ctx [▓▓▓▓▓▓░░░░] 62% · 124k/200k`,
   color-coded green/yellow/red at 70%/90%. Reset times carry a day
   (`tomorrow`/`Thu`/`Aug 23`) whenever the window doesn't reset today, since
   the weekly one is usually days out.
+- **Context meter**, so you see `/compact` coming — see
+  [Context meter](#context-meter) below.
 - **Prompt-cache meter**, because a cold cache spends your windows on work
   you already paid for — see [Prompt cache](#prompt-cache) below.
 - **Nudges Claude directly**, in its own context, as you cross configurable
@@ -83,6 +85,21 @@ is handed only the four raw token counts and has to infer the lifetime by
 watching whether a late request still hit — Claude Code has already worked out
 the TTL, hit ratio and miss causes, so curfew just reads them.
 
+## Context meter
+
+```
+ctx [▓▓▓▓▓▓░░░░] 62% · 124k/200k
+```
+
+How full the context window is: input tokens from the last response (fresh
+input plus cache reads and writes; output doesn't count) against the model's
+window, with the same 70%/90% colours as the usage bars. It reads
+`context_window.used_percentage` and `context_window_size` from the status
+line's stdin. On Claude Code versions without that object it falls back to the
+last assistant message's `usage` in the transcript, against 200k (1M for a
+model id ending in `[1m]`). The segment is left out until the first response
+lands, and again right after `/compact` until the next one.
+
 ## How it works
 
 Claude Code's `statusLine` feature is the only place 5h/7d usage
@@ -109,7 +126,8 @@ Copy `config.example.json` to `~/.claude/curfew/config.json`:
     "compact_at_tokens": 100000,
     "show_misses": false,
     "nudge": true
-  }
+  },
+  "context": { "enabled": true }
 }
 ```
 
@@ -120,11 +138,13 @@ rebuild size above which a lapsed cache goes red and nudges (a judgement call,
 not a documented figure — lower it if cache writes are expensive for you);
 `show_misses` appends the session's miss count; `enabled: false` drops the
 segment entirely and `nudge: false` keeps the meter but stops the nudge.
+`context.enabled: false` drops the context meter.
 
 ## Testing without waiting on real usage
 
 ```bash
 echo '{"model":{"display_name":"Opus"},"session_id":"t","rate_limits":{"five_hour":{"used_percentage":92,"resets_at":9999999999}}}' | node src/statusline.mjs
+echo '{"model":{"display_name":"Opus"},"session_id":"t","context_window":{"total_input_tokens":124000,"context_window_size":200000,"used_percentage":62}}' | node src/statusline.mjs
 echo '{"session_id":"t","tool_name":"Edit"}' | node src/tool-guard.mjs
 ```
 

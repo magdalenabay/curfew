@@ -26,7 +26,9 @@ const DEFAULTS = {
     show_misses: false,
     // Tell Claude, once per lapsed entry, when a cold cache gets expensive.
     nudge: true
-  }
+  },
+  // Context-window meter in the status line.
+  context: { enabled: true }
 };
 
 export function loadConfig() {
@@ -37,7 +39,8 @@ export function loadConfig() {
       ...user,
       thresholds: { ...DEFAULTS.thresholds, ...(user.thresholds || {}) },
       bar: { ...DEFAULTS.bar, ...(user.bar || {}) },
-      cache: { ...DEFAULTS.cache, ...(user.cache || {}) }
+      cache: { ...DEFAULTS.cache, ...(user.cache || {}) },
+      context: { ...DEFAULTS.context, ...(user.context || {}) }
     };
   } catch {
     return DEFAULTS;
